@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Flashlight</string>
+    <string name="back_flashlight">Back flashlight</string>
+    <string name="front_flashlight">Front flashlight</string>
+    <string name="swap_flashlight">Swap flashlight</string>
+</resources>
