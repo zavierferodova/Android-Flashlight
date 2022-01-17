@@ -5,7 +5,6 @@ import android.hardware.camera2.CameraManager
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.PersistableBundle
 import android.view.View
 import androidx.annotation.RequiresApi
 import com.zavierdev.flashlight.databinding.ActivityMainBinding
