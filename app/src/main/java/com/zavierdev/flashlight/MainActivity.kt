@@ -1,124 +1,251 @@
 package com.zavierdev.flashlight
 
 import android.content.Context
+import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
-import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.view.View
-import androidx.annotation.RequiresApi
-import com.zavierdev.flashlight.databinding.ActivityMainBinding
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.Center
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.zavierdev.flashlight.ui.font.roboto
 
-class MainActivity : AppCompatActivity() {
-    companion object {
-        const val CAMERA_IDS_STATE = "CAMERA_IDS_STATE"
-        const val CURRENT_FLASH_CAMERA_STATE = "CURRENT_FLASH_CAMERA_STATE"
-    }
-
-    private lateinit var cameraManager: CameraManager
-    private lateinit var binder: ActivityMainBinding
-    private lateinit var cameraIds: Array<String>
-    private lateinit var currentFlashCameraId: String
-
-    @RequiresApi(Build.VERSION_CODES.M)
+class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binder = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binder.root)
-        initState()
-        initView()
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        outState.putStringArray(CAMERA_IDS_STATE, cameraIds)
-        outState.putString(CURRENT_FLASH_CAMERA_STATE, currentFlashCameraId)
-    }
-
-    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
-        super.onRestoreInstanceState(savedInstanceState)
-        cameraIds = savedInstanceState.getStringArray(CAMERA_IDS_STATE)!!
-        currentFlashCameraId = savedInstanceState.getString(CURRENT_FLASH_CAMERA_STATE)!!
-        toggleCurrentFlashText(currentFlashCameraId)
-    }
-
-    private fun initState () {
-        cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        cameraIds = cameraManager.cameraIdList
-        currentFlashCameraId = cameraIds[0]
-    }
-
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun initView() {
-        binder.btnToggleFlashlight.setOnClickListener {
-            onClickListener(it)
-        }
-        binder.btnSwitchFlashlight.setOnClickListener {
-            onClickListener(it)
+        setContent {
+            MainScreen()
         }
     }
+}
 
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun onClickListener (view: View) {
-        when (view.id) {
-            binder.btnToggleFlashlight.id -> {
-                if (binder.btnToggleFlashlight.isChecked) {
-                    turnOnFlashLight(currentFlashCameraId)
-                } else {
-                    turnOffFlashLight(currentFlashCameraId)
-                }
-            }
-            binder.btnSwitchFlashlight.id -> {
-                // Turn off flashlight when active
-                if (binder.btnToggleFlashlight.isChecked) {
-                    turnOffFlashLight(currentFlashCameraId)
-                }
+enum class CameraPosition {
+    BACK,
+    FRONT
+}
 
-                if (currentFlashCameraId == cameraIds[0]) {
-                    currentFlashCameraId = cameraIds[1]
-                    toggleCurrentFlashText(currentFlashCameraId)
-                } else {
-                    currentFlashCameraId = cameraIds[0]
-                    toggleCurrentFlashText(currentFlashCameraId)
-                }
+@Composable
+@Preview(showBackground = false)
+fun MainScreen() {
+    var isPowerActive by rememberSaveable {
+        mutableStateOf(false)
+    }
+    var activeButton by rememberSaveable {
+        mutableStateOf(CameraPosition.BACK.ordinal)
+    }
+    var activeFlashCameraId by rememberSaveable {
+        mutableStateOf("")
+    }
+    val context = LocalContext.current
 
-                // Turn on back flashlight with changed current flash camera id
-                if (binder.btnToggleFlashlight.isChecked) {
-                    turnOnFlashLight(currentFlashCameraId)
-                }
+    fun getCameraManager(context: Context): CameraManager {
+        return context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+    }
+
+    fun getCameraId(cameraPosition: CameraPosition): String {
+        val cameraManager = getCameraManager(context)
+        val cameraIds = cameraManager.cameraIdList
+
+        for (cameraId in cameraIds) {
+            val cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId)
+            val lensFacing = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING)
+
+            if (lensFacing == CameraCharacteristics.LENS_FACING_BACK && cameraPosition == CameraPosition.BACK) {
+                return cameraId
+            } else if (lensFacing == CameraCharacteristics.LENS_FACING_FRONT && cameraPosition == CameraPosition.FRONT) {
+                return cameraId
             }
         }
+
+        return ""
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun turnOnFlashLight (cameraId: String) {
+    fun turnOnFlashLight(cameraId: String) {
         try {
-            cameraManager.setTorchMode(cameraId, true)
-        } catch(e: Exception) {
+            getCameraManager(context).setTorchMode(cameraId, true)
+        } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
-    private fun turnOffFlashLight (cameraId: String) {
+    fun turnOffFlashLight(cameraId: String) {
         try {
-            cameraManager.setTorchMode(cameraId, false)
-        } catch(e: Exception) {
+            getCameraManager(context).setTorchMode(cameraId, false)
+        } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    private fun toggleCurrentFlashText (cameraId: String) {
-        if (cameraId == cameraIds[0]) {
-            binder.tvCurrentFlashlight.text = getText(R.string.back_flashlight)
+    fun toggleFlashLight() {
+        if (activeFlashCameraId != "") {
+            turnOffFlashLight(activeFlashCameraId)
+        }
+
+        when (activeButton) {
+            CameraPosition.BACK.ordinal -> {
+                activeFlashCameraId = getCameraId(CameraPosition.BACK)
+            }
+
+            CameraPosition.FRONT.ordinal -> {
+                activeFlashCameraId = getCameraId(CameraPosition.FRONT)
+            }
+        }
+
+        if (isPowerActive) {
+            turnOnFlashLight(activeFlashCameraId)
         } else {
-            binder.tvCurrentFlashlight.text = getText(R.string.front_flashlight)
+            turnOffFlashLight(activeFlashCameraId)
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
-    override fun finish() {
-        super.finish()
-        turnOffFlashLight(currentFlashCameraId)
+    fun changePowerStatus() {
+        isPowerActive = !isPowerActive
+        toggleFlashLight()
+    }
+
+    fun setActiveButton(cameraPosition: CameraPosition) {
+        activeButton = cameraPosition.ordinal
+        toggleFlashLight()
+    }
+
+    DisposableEffect(key1 = "TURN_OFF_FLASHLIGHT") {
+        onDispose {
+            turnOffFlashLight(activeFlashCameraId)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF242323),
+                        Color(0xFF000000)
+                    ),
+                )
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            "FLASHLIGHT",
+            fontSize = 30.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            fontFamily = roboto
+        )
+        Spacer(Modifier.height(90.dp))
+        PowerButton(size = 220.dp, isActive = isPowerActive) {
+            changePowerStatus()
+        }
+        Spacer(Modifier.height(40.dp))
+        ButtonStatus(
+            "BACK",
+            isActive = activeButton == CameraPosition.BACK.ordinal,
+            modifier = Modifier.width(220.dp)
+        ) {
+            setActiveButton(CameraPosition.BACK)
+        }
+        Spacer(Modifier.height(10.dp))
+        ButtonStatus(
+            "FRONT",
+            isActive = activeButton == CameraPosition.FRONT.ordinal,
+            modifier = Modifier.width(220.dp)
+        ) {
+            setActiveButton(CameraPosition.FRONT)
+        }
+    }
+}
+
+@Composable
+fun PowerButton(size: Dp, isActive: Boolean = false, onClick: () -> Unit) {
+    val defaultModifier = Modifier
+        .size(size)
+        .border(
+            width = 5.dp,
+            color = Color(0xFF008CDB),
+            shape = CircleShape,
+        )
+        .clip(CircleShape)
+        .clickable {
+            onClick()
+        }
+    val activeModifier = defaultModifier
+        .background(Color.White)
+
+    Box(
+        modifier = if (isActive) activeModifier else defaultModifier
+    ) {
+        Icon(
+            painter = painterResource(id = R.drawable.baseline_power_settings_new_24),
+            contentDescription = "Power Icon",
+            tint = Color(0xFF008CDB),
+            modifier = Modifier
+                .scale(3f)
+                .align(Center)
+        )
+    }
+}
+
+@Composable
+fun ButtonStatus(
+    text: String,
+    isActive: Boolean = false,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    var buttonColors = ButtonDefaults.buttonColors(Color(0xFF4C4E50))
+    var textColor = Color.White
+
+    if (isActive) {
+        buttonColors = ButtonDefaults.buttonColors(Color.White)
+        textColor = Color(0xFF008CDB)
+    }
+
+    Button(
+        onClick = onClick, modifier, colors = buttonColors
+    ) {
+        Text(
+            text,
+            color = textColor,
+            fontFamily = roboto,
+            modifier = Modifier.padding(5.dp)
+        )
     }
 }
