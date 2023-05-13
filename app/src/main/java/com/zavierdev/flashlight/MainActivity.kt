@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -85,9 +86,14 @@ fun MainScreen() {
             val cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId)
             val lensFacing = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING)
 
-            if (lensFacing == CameraCharacteristics.LENS_FACING_BACK && cameraPosition == CameraPosition.BACK) {
+            val isLensFacingBack = lensFacing == CameraCharacteristics.LENS_FACING_BACK
+            val isPositionBack = cameraPosition == CameraPosition.BACK
+            val isLensFacingFront = lensFacing == CameraCharacteristics.LENS_FACING_FRONT
+            val isPositionFront = cameraPosition == CameraPosition.FRONT
+
+            if (isLensFacingBack && isPositionBack) {
                 return cameraId
-            } else if (lensFacing == CameraCharacteristics.LENS_FACING_FRONT && cameraPosition == CameraPosition.FRONT) {
+            } else if (isLensFacingFront && isPositionFront) {
                 return cameraId
             }
         }
@@ -139,8 +145,10 @@ fun MainScreen() {
     }
 
     fun setActiveButton(cameraPosition: CameraPosition) {
-        activeButton = cameraPosition.ordinal
-        toggleFlashLight()
+        if (cameraPosition.ordinal != activeButton) {
+            activeButton = cameraPosition.ordinal
+            toggleFlashLight()
+        }
     }
 
     DisposableEffect(key1 = "TURN_OFF_FLASHLIGHT") {
@@ -245,7 +253,8 @@ fun ButtonStatus(
             text,
             color = textColor,
             fontFamily = roboto,
-            modifier = Modifier.padding(5.dp)
+            modifier = Modifier.padding(5.dp),
+            fontWeight = FontWeight.Medium
         )
     }
 }
